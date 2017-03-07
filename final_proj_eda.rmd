@@ -1,0 +1,1470 @@
+# Prosper Loan Exploration by Naveen Pitchai
+
+The dataset chosen for analysis are loan observations from prosper which has some critical variables to understand how the different parameters of the applicant affect the outcomes of the loan such as APR, loan decision. In this effort, the variables are going to be analyzed as Univariate, Bivariate, and Multivariate plots. 
+
+***
+```{r global_options, include = FALSE}
+knitr::opts_chunk$set(fig.width = 14, fig.height = 13, echo = FALSE,warning = FALSE, message = FALSE, fontsize = 15)
+```
+```{r packages}
+# Load all of the packages that you end up using
+# in your analysis in this code chunk.
+
+# Notice that the parameter "echo" was set to FALSE for this code chunk.
+# This prevents the code from displaying in the knitted HTML output.
+# You should set echo=FALSE for all code chunks in your file.
+library(ggplot2)
+library(lubridate)
+library(dplyr)
+library(knitr)
+library(psych)
+library(gridExtra)
+library(tidyr)
+library(scales)
+library(memisc)
+library(GGally)
+library(MASS)
+library(caTools)
+library(nnet)
+
+```
+
+```{r Load_the_Data}
+#Loading the full dataset
+loan_full <- read.csv('prosperLoanData.csv')
+
+#selecting few variable out of the dataset for analysis
+loan_cut <- subset(loan_full, select = c(ListingNumber,LoanNumber,
+                                         ListingCreationDate,
+                LoanOriginalAmount,LoanOriginationQuarter,
+                Term,LoanStatus,BorrowerAPR,MonthlyLoanPayment,
+                BorrowerRate,ProsperScore,ListingCategory..numeric.,
+                BorrowerState,Occupation,EmploymentStatus,
+                EmploymentStatusDuration,IsBorrowerHomeowner,
+                CreditScoreRangeLower,CreditScoreRangeUpper,
+                CurrentDelinquencies,DelinquenciesLast7Years,
+                AvailableBankcardCredit,StatedMonthlyIncome, 
+                DebtToIncomeRatio, Investors))  
+
+#the data variable is formatted here
+loan_cut$ListingCreationDate = strptime(loan_cut$ListingCreationDate,
+                                        format = '%Y-%m-%d') 
+
+#extracting the year from the date
+loan_cut$loan_year = year(loan_cut$ListingCreationDate)
+
+#filtering the data post 2010
+loan = subset(loan_cut, loan_year >= 2010) 
+
+#removing the listingcreationdate
+loan = subset(loan, select= -ListingCreationDate) 
+
+#making the quarter variable as ordered factor
+loan$LoanOriginationQuarter = factor(loan$LoanOriginationQuarter, levels = 
+                                       c('Q1 2010','Q2 2010','Q3 2010',
+                                         'Q4 2010','Q1 2011','Q2 2011',
+                                         'Q3 2011','Q4 2011','Q1 2012',
+                                         'Q2 2012','Q3 2012','Q4 2012',
+                                         'Q1 2013','Q2 2013','Q3 2013',
+                                         'Q4 2013','Q1 2014'), ordered = TRUE)
+
+state_population = read.csv('state_by_population.csv')
+```
+# Univariate Plots Section
+```{r Univariate_Plots}
+# Dataset has 113937 Observations with 26 variables
+str(loan)  
+
+```
+
+<br>
+
+> Question# 1 - How was the loan amount in the dataset distributed.?
+
+```{r}
+
+ggplot(data = loan, aes(x = LoanOriginalAmount))+
+  geom_histogram(binwidth = 1000, fill = '#6188c6')+
+  scale_x_continuous(breaks = seq(0,35000, 4000), limits = c(0,30000))+
+  scale_y_continuous(breaks = seq(0,14000, 1500))+
+  xlab('Original Loan Amount')+
+  ylab('Count')+
+  ggtitle('Counts of Original Loan Amounts')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 15),
+        axis.text.y = element_text(size = 15))
+
+```
+
+There are spikes in common loan amounts 5k, 10k, 15k, in the above plot.This comes as a no surprise that people usually go for common rounded loan amounts.
+
+<br>
+
+> Question# 2 - How was number of loans given out each quarter was distributed in the dataset.?
+
+```{r}
+
+ggplot(data = loan, aes(x = LoanOriginationQuarter))+
+  geom_histogram(stat = 'count', fill = '#6188c6')+
+  xlab('Quarter')+
+  ggtitle('Loans given per Quarter')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 15))
+```
+
+
+<br>
+
+Above plot is plotted with increased order of quarters.
+
+No. of loans given out has increased as the quarters/years pass. More specifically there has been a consistent increase from Q3-2010 to Q3-2012. This partially could be attributed to the economic downturn post 2008. Also year 2013 has seen sharp increase quarter by quarter. 
+
+<br>
+
+> Question# 3 - How was the prosper score distributed in the dataset.?
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
+ggplot(data = loan, aes(ProsperScore))+
+  geom_histogram(binwidth = 1, fill = '#6188c6')+
+  scale_x_continuous(breaks = seq(1,11,1))+
+  scale_y_continuous(breaks = seq(0,13000,1500))+
+  xlab('Prosper Score of Applicants')+
+  ylab('Count')+
+  ggtitle('Prosper Score distribution')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 15))
+
+```
+
+<br>
+
+The score distribution was about normal with the highest count in score of four. 
+
+<br>
+
+> Question# 4 - How was the credit score distributed in the dataset.?
+
+```{r}
+
+ggplot(data = loan, aes(CreditScoreRangeUpper))+
+  geom_histogram(binwidth = 20, fill = '#6188c6')+
+  scale_x_continuous(breaks = seq(600,900,30))+
+  scale_y_continuous(breaks = seq(0,30000,2000))+
+  xlab('Credit score')+
+  ylab('Count')+
+  ggtitle('Distributon of credit score')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 15))
+
+```
+<br>
+
+It can be seen from the plot that there are lot of observations in the range 680 - 740.
+
+<br>
+
+> Question# 5 - How was the Debt/Income ratio distributed in the dataset.?
+
+```{r}
+
+ggplot(data = loan, aes(DebtToIncomeRatio))+
+  geom_histogram(binwidth = 0.05, fill = '#6188c6')+
+  scale_x_continuous(limits = c(0,1.5), breaks = seq(0,1.5,0.1))+
+  scale_y_continuous(breaks = seq(0,14000,1000))+
+  xlab('Debt/Income ratio')+
+  ylab('Count')+
+  ggtitle('Distributon of Debt/Income ratio')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 15))
+
+```
+
+<br>
+
+the debt distribution has a moderate skew to the right and normal about the range of 0.15 to 0.25.
+
+<br>
+
+> Question# 6 - How was the Current Delinquencies distributed in the dataset.?
+
+```{r}
+
+ggplot(data = loan, aes(CurrentDelinquencies))+
+  geom_histogram(binwidth = 1, fill = '#6188c6')+
+  scale_x_continuous(limits = c(0,20))+
+  scale_y_continuous(limits = c(0,3000))+
+  xlab('Current delinquencies of applicants')+
+  ylab('Count')+
+  ggtitle('Distributon of delinquencies')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 15))
+
+```
+
+<br>
+
+As expected the delinquencies distribution was heavily right skewed with lot of counts concentrated in the lower counts. 
+
+<br>
+
+> Question# 7 - How was the loan counts for the states distributed in the dataset.?
+
+```{r}
+
+loan_ordered <- loan
+
+#Sorting the loan count for borrowerstate to plot later
+loan_ordered = within(loan_ordered, BorrowerState <- factor(BorrowerState, levels = names(sort(table(BorrowerState), decreasing = TRUE))))
+
+ggplot(data = loan_ordered, aes(BorrowerState))+
+  geom_histogram(stat = 'count', fill = '#6188c6')+
+  scale_y_continuous(limits = c(0,11000),breaks = seq(0,10000,1000))+
+  xlab('Borrower State')+
+  ylab('Count')+
+  ggtitle('Distributon of loans for all states(Ordered by count)')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 15))
+```
+
+<br>
+
+Plotting the counts in descending order shows a neat picture on how the laons were distributed across all states, with CA leading with almost double the amount of the 2nd leading state (NY). There can also be seen a very neat consistent trend after first few states.
+
+<br>
+
+To further understand the distribution of loan counts, i decided to plot it against the population data for each state below.
+
+<br>
+
+> Question# 8 - How did the loan counts and population of the states 
+compared each other.?
+
+```{r}
+
+plot1 <- ggplot(data = loan, aes(BorrowerState))+
+  geom_histogram(stat = 'count', fill = '#6188c6')+
+  scale_y_continuous(limits = c(0,11000),breaks = seq(0,10000,1000))+
+  xlab('Borrower State')+
+  ylab('Count')+
+  ggtitle('Distributon of loans for all states')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 15))
+
+plot2 <- ggplot(data = state_population, aes(x = State, 
+                                             y = (Population/1000)))+
+  geom_bar(stat = 'identity', fill = '#6188c6')+
+  xlab('States')+
+  ylab('Population')+
+  ggtitle('Population plot for all states')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 15))
+
+
+grid.arrange(plot1, plot2, nrow = 2)
+
+```
+<br>
+
+Here is a very interesting phenomenon seen in above plot seen side by side shows a stark similarity in distribution between the population of a state and the loan applications of their residents.
+<br>
+
+
+> Question# 9 - How was the loan status distributed in the data set.?
+
+```{r}
+
+ggplot(data = loan, aes(LoanStatus))+
+  geom_histogram(stat = 'count', fill = '#6188c6')+
+  xlab('Loan Status')+
+  ylab('Count')+
+  ggtitle('Distributon of loans for all loan status')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 15))
+
+```
+<br>
+
+No surprises here, the current loan outnumbered all other status by a big margin, 
+although there is a considerable amount of charged off loans.
+
+<br>
+
+> Question# 10 - How was the loan distributed based on home owner status
+in the data set.?
+
+```{r}
+
+ggplot(data = loan, aes(IsBorrowerHomeowner))+
+  geom_histogram(stat = 'count', fill = '#6188c6')+
+  xlab('Home ownership')+
+  ylab('Count')+
+  ggtitle('Distributon of loans based on home ownership')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 15))
+
+```
+<br>
+
+There were more applicants with an own home than the applicants who did not.
+
+<br>
+
+employment status
+term
+
+> Question# 11 - How was the employment status distributed in the dataset.?
+
+```{r}
+ggplot(data = loan, aes(EmploymentStatus))+
+  geom_histogram(stat = 'count', fill = '#6188c6')+
+  scale_y_continuous(breaks = seq(0,70000, 3000))+
+  xlab('Employment status')+
+  ylab('Count')+
+  ggtitle('Distributon of Employment status')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 15))
+
+```
+<br>
+
+Employed count heavily outnumbered any other loan status in the dataset
+
+<br>
+
+> Question# 12 - How was the Loan term distributed in the dataset.?
+
+```{r}
+
+ggplot(data = loan, aes(Term))+
+  geom_histogram(stat = 'count', fill = '#6188c6')+
+  scale_x_continuous(breaks = seq(12,60, 24))+
+  scale_y_continuous(breaks = seq(0,60000,5000))+
+  xlab('Loan Terms')+
+  ylab('Count')+
+  ggtitle('Distributon of loans for Loan terms')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 15))
+
+```
+<br>
+
+From the above plot it can be seen term 36 had very higher count than other two and term 12 count was meager compared to other terms. 
+<br>
+
+
+> Question# 13 - How was the loan distributed for each group of terms.?
+
+```{r}
+
+ggplot(data = loan, aes(x = LoanOriginalAmount))+
+  geom_histogram(binwidth = 700, fill = '#6188c6')+
+  scale_x_continuous(breaks = seq(0,35000, 4000), limits = c(0,30000))+
+  scale_y_continuous(breaks = seq(0,14000, 1500))+
+  xlab('Original Loan Amount')+
+  ylab('Count')+
+  ggtitle('Counts of Original Loan Amounts per selected term')+
+  facet_wrap(~Term, ncol = 1)+
+    theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 15),
+        axis.text.y = element_text(size = 15))
+
+```
+
+<br>
+
+Above plot shows the pattern of loans for each term. 
+
+Most of the loans below 8K were requested with 36 months term and almost similar pattern post 10K for both 36 and 60 months term.
+
+Overall there was not much interest with 12 month term.
+
+<br>
+
+> Question# 14 - How was the income of the dataset distributed.?
+
+```{r}
+
+ggplot(data = loan, aes(x = StatedMonthlyIncome))+
+  geom_histogram(binwidth = 500,fill = '#6188c6')+
+  scale_x_continuous(limits = c(0,30000), breaks = seq(0,30000,2000))+
+  xlab('Stated Monthly Income by applicants')+
+  ylab('Count')+
+  ggtitle('Loan counts based on Monthly Income')+
+    theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 14),
+        axis.text.y = element_text(size = 15))
+
+```
+
+
+The income distribution is moderately skewed to the right with fairly normal distribution.
+
+<br>
+
+> Question# 15 - How are the borrowers APR is distributed in the dataset.?
+
+```{r}
+
+ggplot(data = loan, aes(x = BorrowerAPR))+
+  geom_histogram(binwidth = 0.020, fill = '#6188c6')+
+  scale_x_continuous(breaks = seq(0,0.5,0.02))+
+  xlab("Borrower's APR")+
+  ylab('Count')+
+  ggtitle('Loan counts based on borrowers APR')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 15),
+        axis.text.y = element_text(size = 15))
+
+```
+<br>
+The distribution of Borrower APR is fairly normal except for the unusual peak at around the value of 0.36.
+
+Above anamoly is further analysed in the below question and plot.
+
+<br>
+
+> Question# 16 - What specific factor caused the above mentioned anamoly.?
+
+<br>
+
+Subsetting for the specific APR ranfe
+
+```{r}
+#filtering the original dataset for APR range of 0.34 & 0.36
+loan_selected_APR = subset(loan, BorrowerAPR >= 0.34 & BorrowerAPR <= 0.36)
+
+```
+
+<br>
+
+```{r}
+ggplot(data = loan_selected_APR, aes(LoanOriginalAmount))+
+  geom_histogram(fill = '#6188c6')+
+  xlim(0,15000)+
+  scale_x_continuous(breaks = seq(0,15000, 500))+
+  scale_y_continuous(breaks = seq(0,6000, 200))+
+  xlab('Requested loan amount')+
+  ylab('Count')+
+  ggtitle('Plot for loan amount for the filtered dataset')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 11),
+        axis.text.y = element_text(size = 12))
+
+```
+
+When plotting the distribution with the data filtered aroung the value of anamoly it can be seen that around 50% of the data had loan amount = 4000.
+
+Further analyzing this by filtering the dataset further with amount = 4000
+
+<br>
+
+Tabling the filtered data for Credit Score,
+
+```{r}
+#selecting the observarions which had loan as 4000 $
+loan_selected_4k = subset(loan_selected_APR, LoanOriginalAmount == 4000) 
+
+#further filtering the data set to select observation with score in the range
+#of 659 & 719
+with(subset(loan_selected_4k, CreditScoreRangeUpper >= 659 & 
+              CreditScoreRangeUpper <= 719), table(CreditScoreRangeUpper))
+
+
+```
+
+3342 out of 4523 i.e 74% of the records belonged in credit score range of 660 - 720.
+
+<br>
+
+Tabling for year shows that,
+
+```{r}
+#tabling the loan_year variable
+with(loan_selected_4k, table(loan_year)) 
+
+```
+
+**2885 out of 4523** loans were given out in 2012, or
+**64% of loans** were given out in 2012
+
+<br>
+
+Tabling the data for term shows that,
+
+```{r}
+#tabling the term variable
+with(loan_selected_4k, table(Term)) 
+
+```
+**4126 of 4523** observation had **36 as term** or,
+**91% of of all loans.**
+
+<br>
+
+In conclusion the anamoly of APR around 0.36 can be partially explained by,
+
+* Amount requested
+* Loan Year
+* Loan Term
+
+<br>
+
+> Question# 17: How was the Employment duration of the loan applicants.?
+
+```{r}
+
+ggplot(data = loan, aes(x = EmploymentStatusDuration))+
+  geom_histogram(fill = '#6188c6')+
+  scale_x_continuous(breaks = seq(0,600,30))+
+  xlab('Duration of Employment')+
+  ylab('Count')+
+  ggtitle('Loan Counts based on employment duration')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 15),
+        axis.text.y = element_text(size = 15))
+```
+
+The distribution was skewed heavily to the right with very little normal distribution.It shows the people with less experience has requested for fairly large amounts of loan. 
+
+<br>
+
+> Question# 18 - How are the debt amounts of applicants distributed.?
+
+<br>
+
+Creating a new debt variable based on the ratio.
+
+```{r}
+
+#creating a new variable to find the Debt money in dollars
+loan$DebtMoney = loan$StatedMonthlyIncome * loan$DebtToIncomeRatio 
+
+```
+
+<br>
+
+```{r}
+
+ggplot(data = loan, aes(DebtMoney))+
+  geom_histogram(binwidth = 80, fill = '#6188c6')+
+  xlim(0,5000)+
+  xlab('Debt of Applicants in dollars')+
+  ylab('Count')+
+  ggtitle('Distribution of Debt of Applicants in dollars')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 15),
+        axis.text.y = element_text(size = 15))
+```
+
+The debt money was distributed fairly normally with a moderate skew to the right. 
+
+<br>
+
+# Univariate Analysis
+
+### What is the structure of your dataset?
+
+The dataset is a filtered set from the original dataset and has
+
+> 82675 Observation
+
+> 26 Variables
+    
+Below are few important numeric variables pertaining to the loan data set
+
+* LoanOriginalAmount
+* BorrowerAPR
+* MonthlyLoanPayment
+* BorrowerRate
+* AvailableBankcardCredit
+* StatedMonthlyIncome
+* DebtToIncomeRatio
+
+Below are some important categorical variables
+
+* LoanOriginationQuarter
+* LoanStatus
+* Occupation
+* EmploymentStatus
+
+### What is/are the main feature(s) of interest in your dataset?
+
+The main features here to learn the pattern on loan scene are: Prospect Score, LoanOriginalAmount, BorrowerAPR
+
+ProspectScore can be predicted based on the indicators such as DebtToIncomeRatio, StatedMonthlyIncome, AvailableBankcardCredit
+
+### What other features in the dataset do you think will help support your investigation into your feature(s) of interest?
+
+Below features will help in analysing the trend and predict the risk factor of loans,
+
+* CurrentDelinquencies
+* DelinquenciesLast7Years
+* StatedMonthlyIncome
+* EmploymentStatus
+* IsBorrowerHomeowner
+* CreditScoreRangeUpper
+
+### Did you create any new variables from existing variables in the dataset?
+
+Year variable was created to to filter some data out and Listing date was cleaned a bit.
+
+Debt in dollars of each applicants and distributed.
+
+### Of the features you investigated, were there any unusual distributions? Did you perform any operations on the data to tidy, adjust, or change the form of the data? If so, why did you do this?
+
+The Loan counts constantly increased with few anamolies as the quarters/years passed, which does not seem to have a reasonable explanation.
+
+In addition to that there was an unsually large number of loans with APR around 0.36.
+
+So the data was futher filtered, cleaned to analyze the cause of that, it seems the high number has originated from a particular year, term and a particular range of credit score. 
+There was also an intersting phenomenon when the loan counts was compared against the population of the state, the distribution was very much alike.
+
+# Bivariate Plots Section
+
+> Question# 19 - How is the realtionship between prosper score and APR.?
+
+```{r Bivariate Plots}
+
+ggplot(data = loan, aes(x = ProsperScore, y = BorrowerAPR))+
+  geom_jitter(alpha = 1/10)+
+  scale_x_continuous(breaks = seq(1,10,1))+
+  scale_y_continuous(trans = log10_trans())+
+  xlab('ProsperScore of the observations')+
+  ylab('BorrowerAPR of the observations')+
+  ggtitle('BorrowerAPR vs ProsperScore')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 15),
+        axis.text.y = element_text(size = 15))
+
+```
+
+The relatioship between prosper score and borrowerAPR was as expected, APR increased as the prosper score declined, moderate negative correlation.  
+
+<br>
+
+> Question# 20 - How did the APR fared when plotted against the credit score.?
+
+```{r}
+
+ggplot(data = loan, aes(x = CreditScoreRangeUpper, y = BorrowerAPR))+
+  geom_jitter(alpha = 1/10)+
+  scale_x_continuous(breaks = seq(500,900,20))+
+  geom_smooth(method = 'lm')+
+  xlab('Credit Score of the Applicants')+
+  ylab('BorrowerAPR')+
+  ggtitle('BorrowerAPR vs CreditScoreUpper Range')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 15),
+        axis.text.y = element_text(size = 15))
+
+```
+
+In the above plot the relatioship between credit score and borrowerAPR was negatively correlated to an extent, which is logical taking in to account how the loans work. 
+
+<br>
+
+> Question# 21 - How was the Loan amount and prosper score was associated.?
+
+```{r}
+
+ggplot(data = loan, aes(x = ProsperScore, y = LoanOriginalAmount))+
+  geom_line(stat = 'summary', fun.y = mean)+
+  scale_x_continuous(breaks = seq(1,10,1))+
+  scale_y_continuous(breaks = seq(0,20000, 500))+
+  xlab('ProsperScore for the loans')+
+  ylab('Mean requested loan amount')+
+  ggtitle('Prosper Score vs Mean requested Loan Amount')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 15),
+        axis.text.y = element_text(size = 15))
+```
+
+It can be seen from the plot that higher prosper score were associated to higher amounts of loan. 
+
+<br>
+
+> Question# 22 - How was the loan amounts requested related to the monthly income.?
+
+```{r}
+
+ggplot(data = loan, aes(x = StatedMonthlyIncome, y = LoanOriginalAmount))+
+  geom_jitter()+
+  scale_x_continuous(limits = c(0,20000))+
+  scale_y_log10()+
+  xlab('Monthly Income of Loan Applicants')+
+  ylab('Original Amount of the loan')+
+  ggtitle('Monthly income vs Loan Amount')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 15),
+        axis.text.y = element_text(size = 15))
+
+```
+
+From the above plot it can be seen that the loan amount requested got higher as the monthly income increased and had a very very minor correlation. 
+
+<br>
+
+> Question# 23 : How did the Monthly remaining income after debt and payments faired againts the Debt to income ratio.
+
+<br>
+
+Creating a new monthly remaining variable after deducting payments and debt
+
+```{r}
+#creating a new variable by removing the debt & monthlyloanpayment
+loan$Monthly_remain = (loan$StatedMonthlyIncome - (loan$DebtMoney + loan$MonthlyLoanPayment))  
+
+```
+
+<br>
+
+```{r}
+
+ggplot(data = loan, aes(x = DebtToIncomeRatio, y = Monthly_remain))+
+  geom_jitter(alpha = 1/5)+
+  scale_x_continuous(limits = c(0,1.0))+
+  scale_y_log10()+
+  xlab('Debt/Income ratio of Loan Applicants')+
+  ylab('Monthly Remaining in log scale')+
+  ggtitle('Debt/Income ratio vs log of Monthly remaining')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 15),
+        axis.text.y = element_text(size = 15))
+```
+
+As it can be seen from the above plot when the remaining income was plotted on a log scale against the Debt to income ratio, it can be seen that Debt has increased as the income declined. 
+
+> Question# 24 - How, The Delinquencies, one of the key factor of loans, faired against the delinquencies.?
+  
+```{r}
+ggplot(data = loan, aes(x = CurrentDelinquencies, y = BorrowerAPR))+
+  geom_jitter(alpha = 1/5)+
+  scale_x_continuous(limits = c(0,10))+
+  xlab('Current delinquencies of Applicants')+
+  ylab('APR for the loans')+
+  ggtitle('Current delinquencies vs APR')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 15),
+        axis.text.y = element_text(size = 15))
+```
+
+In the above plot Deinquencies and the APR did not seem to correlate well and went against my intuition. 
+
+```{r}
+ggplot(data = loan, aes(x = CurrentDelinquencies, y = StatedMonthlyIncome))+
+  geom_jitter(alpha = 1/5)+
+  scale_x_continuous(limits = c(0,10))+
+  ylim(0,80000)+
+  xlab('Current Delinquencies of Loan Applicants')+
+  ylab('Monthly Income of Loan Applicants')+
+  ggtitle('Monthly income vs Current Delinquencies')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 15),
+        axis.text.y = element_text(size = 15))
+```
+
+The plot between Delinquencies and income shows there were less delinquencies as the income got better. 
+
+<br>
+
+> Question# 25 - How did the loan amount statistics were for each state.?
+
+```{r}
+ #creating a new dataframe with states grouped. 
+loan_by_state = loan %>% group_by(BorrowerState) %>%
+  summarize(mean_amount = mean(LoanOriginalAmount), 
+            median_amount = median(LoanOriginalAmount), n = n()) %>%
+  arrange(mean_amount)
+
+
+p1 <- ggplot(data= loan_by_state, aes(x = BorrowerState, y = mean_amount))+
+  geom_point()+
+  geom_line(aes(group = 1), color = 'blue')+
+  geom_text(aes(label = floor(mean_amount)), hjust = -0.2, vjust =0)+
+  xlab('Borrower State')+
+  ylab('Mean Loan Amount per state')+
+  ggtitle('Plot between state and mean loan amount each state')+
+  theme(plot.title = element_text(face = 'bold', hjust = 0.5, size = 15),
+        axis.title.x = element_text(face = 'bold', size = 12),
+        axis.title.y = element_text(face = 'bold', size = 12))
+
+p2 <- ggplot(data= loan_by_state, aes(x = BorrowerState, y = median_amount))+
+  geom_point()+
+  geom_line(aes(group = 1), color = 'blue')+
+  geom_text(aes(label = floor(median_amount)), hjust = -0.2, vjust =0)+
+  xlab('Borrower State')+
+  ylab('Median Loan Amount per state')+
+  ggtitle('Plot between state and median loan amount each state')+
+  theme(plot.title = element_text(face = 'bold', hjust = 0.5, size = 15),
+        axis.title.x = element_text(face = 'bold', size = 12),
+        axis.title.y = element_text(face = 'bold', size = 12))
+
+grid.arrange(p1,p2, ncol = 1)
+```
+
+Above plot shows the mean loan amount requested for each state. 
+
+DC had highest of loan amount and South Dakota the lowest, but when taking median in to account most of the things changes.
+
+* New Mexico comes at the top. 
+* There are two states, now, with lowest loan amounts.
+* A mode formed at the value of 9000.
+
+<br>
+
+Below shows some of the statistics for each term. 
+
+```{r}
+#statistics for each variable grouped by terms
+describeBy(loan$LoanOriginalAmount, group = loan$Term) 
+```
+
+<br>
+
+> Question# 26 - Did owning a home had any effect on loan APR.?
+
+```{r}
+ggplot(data = loan, aes(x = IsBorrowerHomeowner, y = BorrowerAPR))+
+  geom_boxplot(fill = '#f48f42')+
+  scale_y_continuous(breaks = seq(0,0.5,0.025))+
+  stat_summary(fun.y = 'mean', color = 'black', size = 2, geom = 'point')+
+  xlab('Is Borrower Home owner')+
+  ylab('APR for observations')+
+  ggtitle('APR vs Home Owners')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 17),
+        axis.text.y = element_text(size = 15))
+```
+
+The Home owners had considerable low APR compared to people who did not. 
+
+<br>
+
+> Question# 27 - How are the loans spread out across current loan status.?
+
+```{r}
+ggplot(data = loan, aes(x = LoanStatus, y = LoanOriginalAmount))+
+  geom_boxplot(fill = '#f48f42')+
+  scale_y_continuous(breaks = seq(0,35000,2000))+
+  xlab('Status of the Loans')+
+  ylab('Requested loan amounts')+
+  ggtitle('Loan amount vs Loan Status')+
+  theme(plot.title = element_text(face = 'bold', hjust = 0.5, size = 15),
+        axis.title.x = element_text(face = 'bold', size = 12),
+        axis.title.y = element_text(face = 'bold', size = 12))
+```
+
+Above plot shows the statistical summary of the loan amounts across all loan status.
+
+Below are some observations
+
+* One obvious is there are lot of loans in current status
+* There are lot of loans with due past 120 days
+* There were lot of outliers with higher amounts for chargedoff loans
+
+<br>
+
+> Question# 28 - How was the APR statistics were across different employment types.?
+
+```{r}
+
+loan_by_employement = loan %>% group_by(EmploymentStatus, ProsperScore) %>%
+  summarize(mean_APR = mean(BorrowerAPR),
+            median_APR = median(BorrowerAPR), 
+            mean_amount = mean(LoanOriginalAmount),
+            median_amount = median(LoanOriginalAmount),
+                                   n=n()) #creating a new dataframe of median/mean  grouped by employment status & Prosperscore
+
+ggplot(loan, aes(x = EmploymentStatus, y = BorrowerAPR))+
+  geom_line(stat = 'summary', fun.y = mean, aes(group = 1), color = 'red')+
+  geom_line(stat = 'summary', fun.y = median, aes(group = 1), linetype = 2, 
+            color = 'blue')+
+  scale_y_continuous(breaks = seq(0,0.35, 0.010))+
+  xlab('Employment status of the applicants')+
+  ylab('APR statistics of the applicants')+
+  ggtitle('Employment Status vs Mean & Median APR')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 15),
+        axis.text.y = element_text(size = 15))
+```
+
+Above plot shows how the APR changed based on the Employment Status of the applicant. 
+
+Generally both Mean & Median across all status stayed relatively close. Non-Employed had the highest APR and Employed the lowest.
+
+<br>
+
+> Question# 29 - Moving away little from the main parameters, how did the credit score was related to the applicants available credit.?
+
+```{r}
+cor.test(x = loan$AvailableBankcardCredit, y = loan$CreditScoreRangeUpper)
+
+ggplot(data = loan, aes(x = CreditScoreRangeUpper, 
+                        y = AvailableBankcardCredit))+
+  geom_jitter(alpha = 1/5)+
+  geom_smooth()+
+  scale_y_log10()+
+  xlab('Credit Score (upper)')+
+  ylab('Available credit in log scale')+
+  ggtitle('Available Credit (log scale) vs Credit score upper')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 15),
+        axis.text.y = element_text(size = 15))
+  
+```
+
+The Above relationship between Credit score and available credit has a moderate positive correlation between them. As the credit score increased the available credit increased. 
+
+<br>
+
+> Question# 30 -  How does the Debt affected the Credit Score of the applicants.?
+
+```{r}
+ggplot(data = loan, aes(x = CreditScoreRangeUpper, y = DebtMoney))+
+  geom_line(stat = 'summary', fun.y = median)+
+  scale_x_continuous(breaks = seq(619,900,20))+
+  xlab('Credit Score of Applicants')+
+  ylab('Median Debt of Applicants in dollars')+
+  ggtitle('Credit Score vs Median debt in dollars')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 15),
+        axis.text.y = element_text(size = 15))
+```
+
+The Above plot shows an interesting trend on Debt vs Credit Scores, Up until the score of 740(common average score) the debt has increases and declined constantly post that. Right after the common average score, the credit score, along with few other parameters, was influenced by the amount of Debt, applicants had at that time. 
+
+<br>
+
+# Bivariate Analysis
+
+### Talk about some of the relationships you observed in this part of the investigation. How did the feature(s) of interest vary with other features in the dataset?
+
+One of the important and interesting relationships can be found between the Borrowers APR and other variables such as ProsperScore, Monthly income, Credit Score, if the borrower is home owner
+
+As the prosper score gets better/increases, the BorrowerAPR comes down as expected.
+
+The employment status heavily affected the APR applicants have gotten as seen from the median/mean plot.
+
+Borrower APR and credit score had a  moderatly negative correlation.
+
+### Did you observe any interesting relationships between the other features (not the main feature(s) of interest)?
+
+The other interesting relationship apart from the main features is the one between Credit score and Available Credit of the applicant. 
+
+It had a medium positive correlation between them.
+
+
+### What was the strongest relationship you found?
+
+The Strongest correlation between any two variable is the negative correlation between
+Prosper score and Borrower APR. As the Prosper score increased the APR came down. 
+
+The next best correlation is the moderate negative correlation between available credit and credit score.
+
+<br>
+
+# Multivariate Plots Section
+
+<br>
+
+The plot between APR and Prosper Score based on the employment status of the applicants. 
+
+```{r Multivariate Plots}
+
+ggplot(data = loan, aes(x = ProsperScore, y = BorrowerAPR, 
+                        color = EmploymentStatus))+
+  geom_jitter(alpha = 1/10)+
+  scale_x_continuous(breaks = seq(1,10,1))+
+  scale_y_continuous(trans = log10_trans())+
+  scale_color_brewer(type = 'div',
+                     guide = guide_legend(title = 'Employment Status', 
+                                          reverse = T,
+                                          override.aes = list(alpha = 1, 
+                                                              size = 2)))+
+  xlab('ProsperScore of the observations')+
+  ylab('BorrowerAPR of the observations in log scale')+
+  ggtitle('BorrowerAPR in log scale vs ProsperScore')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 15),
+        axis.text.y = element_text(size = 15))
+
+```
+
+> Question# 31 - How was the statistics of APR for different employment status.?
+
+```{r}
+
+p3 = ggplot(data = loan, aes(x = ProsperScore, y = BorrowerAPR))+
+  geom_line(aes(color = EmploymentStatus), stat = 'summary' , fun.y = mean)+
+  xlab("Prosper Score for Applicants")+
+  ylab("Mean APR for Applicants")+
+  ggtitle('Mean APR vs ProsperScore based on employment status')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 15),
+        axis.text.y = element_text(size = 15))
+
+p4 = ggplot(data = loan, aes(x = ProsperScore, y = BorrowerAPR))+
+  geom_line(aes(color = EmploymentStatus), stat = 'summary' , fun.y = median)+
+  xlab("Prosper Score for Applicants")+
+  ylab("Median APR for Applicants")+
+  ggtitle('Median APR vs ProsperScore based on employment status')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 15),
+        axis.text.y = element_text(size = 15))
+
+grid.arrange(p3,p4)
+
+```
+
+In above plots, both mean and median scenarios, it can be clearly seen unemployed, Part-time APR has been steady and higher for prosper scores below six. 
+
+On the other hand the more secured loans(with higher prosper score), ie towards the end of the plot, did not have much fluctuation in APR, may be due to the other factors such as Credit score, Debt ratio etc.
+
+<br>
+
+> Question# 32 - Did having a home affected the APR of applicants.?
+
+```{r}
+ggplot(data = loan, aes(x = ProsperScore, y = BorrowerAPR))+
+  geom_line(aes(color = IsBorrowerHomeowner),stat = 'summary', fun.y = mean)+
+  scale_x_continuous(breaks = seq(0,10,1))+
+  scale_y_continuous(breaks = seq(0,0.35, 0.025))+
+  xlab('Prosper score')+
+  ylab('Mean APR for Applicants')+
+  ggtitle('Prosper Score vs Mean Borrower APR based on home owner')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 15),
+        axis.text.y = element_text(size = 15))
+```
+
+When plotted for whether applicants was home owner or not the APR was higher for non home owners except for the lowest prosper score. 
+
+<br>
+
+> Question# 33 : How much of a difference is there between APR for Employed & Not Employed.?
+
+```{r}
+
+#created a new variable with only Employed and non emplyed record
+
+loan_by_employement_selected = subset(loan,EmploymentStatus == 'Employed' | EmploymentStatus == 'Not employed') %>% 
+  group_by(EmploymentStatus,ProsperScore) %>%
+  summarize(mean_APR = mean(BorrowerAPR),
+            median_APR = median(BorrowerAPR), 
+            mean_amount = mean(LoanOriginalAmount),
+            median_amount = median(LoanOriginalAmount),
+                                   n=n())
+
+#Below converting from long to wide format
+
+wide_loan_employment_selected = subset(loan_by_employement_selected, select = c('ProsperScore', 'EmploymentStatus', 'median_APR' )) %>%
+  spread(EmploymentStatus, median_APR)
+
+ggplot(data = wide_loan_employment_selected, 
+       aes(x = ProsperScore, y = (Employed/`Not employed`)))+
+  geom_hline(aes(yintercept = 1))+
+  geom_line()+
+  scale_x_continuous(breaks = seq(1,10,1), limits = c(1,10))+
+  ylab('Ratio of mean APRs by employment status')+
+  ggtitle('Ratio of Median APR between Employed and Not Employed Applicants')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 15),
+        axis.text.y = element_text(size = 15))
+
+```
+
+After plotting the ratio of the two status with an intercept line, it can be seen that the ratio started with close to 1 for higher volatile loans and hit an alltime low at prosper score of 4, then the APR difference got smaller and broke through the intercept line for the highest prosper score.
+
+<br> 
+
+In attempt to further analysis this unusual phenomenon of un-employed applicants getting comparable scores with employed applicants, below attempts was made.
+
+<br>
+
+Analyzing the lowest point of the ratio (prosper score = 4)
+
+Checking one of the common parameters, Credit score might have affected the APR, also the prosper score.
+
+<br>
+
+```{r}
+
+loan_4 = subset(loan, ProsperScore == 4) #subsetting the loan df with observations having prosperscore = 4
+test_4 = subset(loan_4, EmploymentStatus == 'Not employed') #further subsetting the above dataframe to filter status = Not employed
+summary(test_4$CreditScoreRangeUpper)
+
+```
+
+<br>
+
+Analyzing the lowest point of the ratio (prosper score = 4)
+
+<br>
+
+```{r}
+loan_8 = subset(loan, ProsperScore == 8)
+test_8 = subset(loan_8, EmploymentStatus == 'Not employed')
+summary(test_8$CreditScoreRangeUpper)
+```
+
+<br>
+
+For Non employed applicants with prosper score = 4 and relatively lower APR than Employed applicants, the 1st quarter credit score was 40 points lower compared to the observations with prosper score = 8
+
+<br>
+
+Same goes for the max credit score, so that among the other factors has resulted in lower APR for un-employed applicants in higher prosper scores. 
+
+<br>
+
+> Question# 34 - How did the APR faired for different delinquency buckets.?
+
+```{r}
+
+#Bucketing the variable CurrentDelinquencies
+
+loan$Delinq_bucket = cut(loan$CurrentDelinquencies, breaks = c(0,1,3,5,8),
+                         include.lowest = TRUE)
+ 
+
+ggplot(data = subset(loan, !is.na(Delinq_bucket) ),aes(x = ProsperScore, y = BorrowerAPR))+
+  geom_line(aes(color = Delinq_bucket), stat = 'summary', fun.y = median)+
+  ggtitle('APR vs Scores based on Delinquencies')+
+  ylab('Median APR by the delinquency bucket')+
+  xlab('Prosper Score')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 15),
+        axis.text.y = element_text(size = 15))
+  
+```
+
+In the Above plot the APR is plotted against Prosper Score based on the delinqueny bucket created. 
+
+It can be seen the mean APR for different prosper score has been significantly low for the most part based on the number of delinquencies the applicant had. 
+
+<br>
+  
+> Question# 35 - How does the Monthly income affected the scores for both Homeowner and non-home owner.?
+
+> Question# 36 - How did it vary if debt and loan payment is removed from the income.?
+
+```{r}
+
+pp1 <- ggplot(data = loan, aes(x = ProsperScore, y = StatedMonthlyIncome))+
+  geom_line(stat = 'summary', fun.y = median)+
+  scale_x_continuous(breaks = seq(1,10,1))+
+  xlab('Prosper Score')+
+  ylab('Median Monthly Income')+
+  ggtitle('Prosper Score vs Median Monthly Income')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 15),
+        axis.text.y = element_text(size = 15))
+
+pp2 <- ggplot(data = loan, aes(x = ProsperScore, y = Monthly_remain))+
+  geom_line(stat = 'summary', fun.y = median)+
+  scale_x_continuous(breaks = seq(1,10,1))+
+  xlab('Prosper Score')+
+  ylab('Median income after the debt and loan payment')+
+  ggtitle('Prosper Score vs Median Income after debt & loan payment')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 15),
+        axis.text.y = element_text(size = 15))
+
+grid.arrange(pp1,pp2)
+
+```
+
+Most commonly as the Prosper score increased the Monthly income increased and viceversa. 
+
+The curve was much smoother when plotted with the income after removing debt and payment, most specifically for the lower prosper score, the sudden change in the fig 1 is explained in fig 2. 
+
+```{r}
+
+ppp1 <- ggplot(data = loan, aes(x = ProsperScore, y = StatedMonthlyIncome))+
+  geom_line(stat = 'summary', fun.y = median,aes(color = IsBorrowerHomeowner))+
+  scale_x_continuous(breaks = seq(1,10,1))+
+  xlab('Prosper Score')+
+  ylab('Median Monthly Income')+
+  ggtitle('Prosper Score vs Total Monthly Income')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 15),
+        axis.text.y = element_text(size = 15))
+
+ppp2 <- ggplot(data = loan, aes(x = ProsperScore, y = Monthly_remain))+
+  geom_line(stat = 'summary', fun.y = median,aes(color = IsBorrowerHomeowner))+
+  scale_x_continuous(breaks = seq(1,10,1))+
+  xlab('Prosper Score')+
+  ylab('Median income after the debt and loan payment')+
+  ggtitle('Prosper Score vs Income after debt & loan payment')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 15),
+        axis.text.y = element_text(size = 15))
+
+grid.arrange(ppp1,ppp2)
+
+```
+
+In the above plot, in both figures, there can be seen a big difference in the stated income between home owner and non-home owner. As with the previous plots, the figure with income after removing debt and payment is much smoother and consistent.
+
+The space between home owner and non home owner was bigger with only Monthly income plot.
+
+<br>
+
+Linear Model for predicting Prosper Score for a loan applicant. 
+
+<br>
+
+```{r}
+m1 = lm(I(ProsperScore) ~ I(log10(BorrowerAPR)), data = loan)
+m2 = update(m1, ~.+ LoanOriginalAmount)
+m3 = update(m2, ~.+ Term)
+m4 = update(m3, ~.+ EmploymentStatus)
+m5 = update(m4, ~.+ EmploymentStatusDuration)
+m8 = update(m5, ~.+ CreditScoreRangeUpper)
+m9 = update(m8, ~.+ AvailableBankcardCredit)
+m11 = update(m9, ~.+ Monthly_remain)
+m12 = update(m11, ~.+ CurrentDelinquencies)
+
+mtable(m1,m2,m3,m4,m5,m8,m9,m11,m12)
+```
+<br>
+
+The linear model created could only 50% variance in the Prosper score of the applicants. 
+
+<br>
+
+Below Code fits a multinomial logistic regression to predict the Prosper Score. 
+
+```{r}
+
+#loan_lr <- sample_n(loan_lr, 20000)
+#selecting few key variables to predict the Prosper score
+loan_lr <- subset(loan, select = c(ProsperScore,LoanOriginalAmount,
+                                   CreditScoreRangeUpper, CurrentDelinquencies,                                              BorrowerAPR, LoanOriginalAmount,
+                                   EmploymentStatus, StatedMonthlyIncome,
+                                   Term, Investors, IsBorrowerHomeowner))
+
+loan_lr <- subset(loan_lr, !is.na(ProsperScore))
+
+set.seed('45')
+
+split <- sample.split(loan_lr,SplitRatio = 0.90)
+
+loantrain <- subset(loan_lr, split == TRUE)
+loantest <- subset(loan_lr, split == FALSE)
+
+model <- multinom(ProsperScore ~ BorrowerAPR + CreditScoreRangeUpper + 
+                    EmploymentStatus + Investors + IsBorrowerHomeowner, 
+                  loantrain, maxit = 12000)
+
+#predicting and adding the prediction in the test set
+loantest$predicted = predict(model,loantest)
+
+#finding the accuracy of the model 
+accuracy <- mean(loantest$ProsperScore == loantest$predicted)
+
+accuracy
+```
+<br>
+
+The Multinomial logistic regression has performed poorly and could only predict the right value 26% of the time. 
+
+<br>
+
+# Multivariate Analysis
+
+### Talk about some of the relationships you observed in this part of the investigation. Were there features that strengthened each other in terms of looking at your feature(s) of interest?
+
+When prosper score and APR was plotted, color coded with Employment status, we can see a negative correlation (not a good linear distribution though) and can see dominance of Employed applicants in the data set
+
+When the statistics of APR was plotted agains the prosper score for different employment status, we can see an unmistakable difference in APR between Employed, Self-employed and Not employed, retired, part time. 
+
+
+### Were there any interesting or surprising interactions between features?
+
+When plotting the APR difference between employed and not employed applicants, it can be seen the ratio was close to or more than 1 on either end of the prosper score spectrum. That has been further analyzed in detail and was attributed to the higher credit score of not employed applicants. 
+
+### OPTIONAL: Did you create any models with your dataset? Discuss the strengths and limitations of your model.
+
+Although the variables did not form a very good linear distribution, a model was created to explain the variations in the prosper score based on APR, Credit score, Delinquencies etc. The model did not do a very good job and explained only 50% of variation in propser score by other variables.
+
+------
+
+# Final Plots and Summary
+
+### Plot One
+```{r Plot_One}
+ggplot(data = loan, aes(x = BorrowerAPR))+
+  geom_histogram(binwidth = 0.020, fill = '#665141')+
+  scale_x_continuous(breaks = seq(0,0.5,0.02))+
+  scale_y_continuous(breaks = seq(0,10000, 500))+
+  xlab("Borrowers APR")+
+  ylab('Count')+
+  ggtitle('Loan counts based on borrowers APR')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 15),
+        axis.text.y = element_text(size = 15))
+```
+
+### Description One
+
+This plot shows the count of loans based on the APR it was given out for, It does a great job in providing an overall picture of how APR was spread through out the dataset.A close to normal distribution with an abnormal spike in the vicinity of APR = 0.36.
+
+That abnormality was further anlayzed in detail and it was found out to coming from a specific year, term and a particular amount. 
+
+<br>
+
+### Plot Two
+```{r Plot_Two}
+
+ggplot(data = loan, aes(x = ProsperScore, y = BorrowerAPR))+
+  geom_jitter(alpha = 1/10)+
+  scale_x_continuous(breaks = seq(1,10,1))+
+  scale_y_continuous(trans = log10_trans())+
+  xlab('ProsperScore of the observations')+
+  ylab('BorrowerAPR of the observations')+
+  ggtitle('BorrowerAPR vs ProsperScore')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 15),
+        axis.text.y = element_text(size = 15))
+
+```
+
+### Description Two
+
+This plot between Score and APR was chosen because it does a pretty neat job of explaining the negatively correlated relationship between them. This proves that APR played a major factor in deducing prosper score or the other way around too. 
+
+
+### Plot Three
+```{r Plot_Three}
+
+ggplot(data = loan, aes(x = ProsperScore, y = BorrowerAPR))+
+  geom_line(aes(color = EmploymentStatus), stat = 'summary' , fun.y = mean)+
+  scale_x_continuous(breaks = seq(1,10,1))+
+  xlab("Prosper Score for Applicants")+
+  ylab("Mean APR for Applicants")+
+  ggtitle('Mean APR vs ProsperScore based on employment status')+
+  theme(plot.title = element_text(face = 'bold', size = 20, hjust = 0.5),
+        axis.title.x = element_text(face = 'bold', size = 17),
+        axis.title.y = element_text(face = 'bold', size = 17),
+        axis.text.x = element_text(size = 15),
+        axis.text.y = element_text(size = 15))
+
+```
+
+### Description Three
+
+This third plot was chosen to show the effect of employment status on the APR by plotting the mean APR for each prosper score by the employment status. The plot shows that employed, self-employed applicants had a much lower APR than the not employed, part time applicants. This clearly shows the status did have a considerable effect on the APR. Although this difference can be seen till a score of 7 and the gap closed beyond that which can be attributed to the higher credit score, lower debt of the applicants despite their employment status.
+
+------
+
+# Reflection
+
+The loan dataset with some key variables involved in determining APR, Propser score was anlayzed for different parameters of main interest such as APR, Score, Creditscore, Loan amount and secondary parameters such as Debt, Monthly income, Employment status, loan quarter etc. 
+
+Some plots between APR, Prosper score, Employment status, delinquencies gave us a very good understanding on how the variables were related to each other suhc as Question# 2, Question# 5.
+
+Some challenges rose when there were some abnormalities in the APR distributoin plots and ratio of APR plots, so those were further filtered, analyzed in order to explain the abnormalities. as a whole those were explained by certain parameters to some extent. 
+
+The linear distribution plotted was not very good, so the model built on it did not do a good job in explaining the variations in the parameter of interest. The dataset contains employed applicants as a majot portion as opposed to others and for future analysis the concentration of this could be more comparable to others.
+
+In conclusion, the current dataset does a good job in explaining the relationship between some important parameters and this analysis can be further improved by a balanced data set and with some more variables such as loans which were denied, pre closure information, No. of accounts the applicants had etc. 
+
+
